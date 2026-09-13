@@ -1,7 +1,7 @@
 {
-  "number": 11,
+  "number": 12,
   "sampled_cli_sha": "d9f6f73d11dd14a8d308d65a35a7cfe23344062a",
   "sampled_plugin_sha": "030b67bcadefa5e6acf60d2f1374d50fe3abd032",
-  "prepared_at": "2026-09-13T14:32:22.108756+00:00",
+  "prepared_at": "2026-09-13T14:35:26.308915+00:00",
   "kind": "original six-step Windows/Python3.13 Colorama slice; no tool/image/runner adaptation"
 }
