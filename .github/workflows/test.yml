@@ -53,33 +53,50 @@ jobs:
         if: ${{ failure() }}
         shell: pwsh
         run: |
-          # Failure-only lab diagnostic. Never change installer settings or inspect general environment.
+          # Explicitly authorized diagnostic retry, not setup-python/workflow success.
           $ErrorActionPreference = 'Stop'
-          Write-Output '=== Python 3.13 installer diagnostic step executed ==='
-          # Native controls are public; retain full installer logs only on the private Buildkite runtime.
+          Write-Output '=== DIAGNOSTIC ONLY: repeat CPython installer with explicit logging ==='
           if ($env:RUNNER_TEMP -notmatch '[\\/]buildkite-gha-runner-\d+$') {
-              Write-Output 'Full installer diagnostics omitted outside the private Buildkite runtime'
+              Write-Output 'Installer retry omitted outside the private Buildkite runtime'
               exit 0
           }
-          $roots = @($env:TEMP, $env:RUNNER_TEMP) | Where-Object { $_ } | Select-Object -Unique
-          $seen = @{}
-          $files = @()
-          foreach ($root in $roots) {
-              if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
-              $candidates = Get-ChildItem -LiteralPath $root -File -Filter '*3.13*.log' -Recurse -Depth 4 -ErrorAction SilentlyContinue |
-                  Select-Object -First 64
-              foreach ($file in $candidates) {
-                  if ($file.Name -notmatch '(?i)python.*3\.13|3\.13.*python') { continue }
-                  if (-not $seen.ContainsKey($file.FullName)) {
-                      $seen[$file.FullName] = $true
-                      $files += $file
-                  }
-              }
+          $pythonArchPath = Join-Path $env:RUNNER_TOOL_CACHE 'Python\3.13.15\x64'
+          $exeName = 'python-3.13.15-amd64.exe'
+          $installer = Join-Path $pythonArchPath $exeName
+          $item = Get-Item -LiteralPath $installer -Force
+          if ($item -isnot [IO.FileInfo] -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+              throw 'Expected exact regular Python 3.13.15 installer file'
           }
-          $selected = @($files | Sort-Object LastWriteTime -Descending | Select-Object -First 8)
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          # Binary from the exact 3.13.15-31064747964 release asset; rejects another version or altered file.
+          if ($hash -ne 'edec09c4853aeae9ac36efb8c9f95b6b8e2fee65eee56d9767a8b7c69c574403') {
+              throw 'Installer hash does not match the inspected Python 3.13.15 release asset'
+          }
+          Write-Output ('Installer verified: ' + $installer + '; SHA256=' + $hash)
+          Write-Output ('Installer ProductVersion=' + $item.VersionInfo.ProductVersion)
+          $logPath = Join-Path $env:RUNNER_TEMP 'python-installer-diagnostic.log'
+          $execParams = "DefaultAllUsersTargetDir=$pythonArchPath InstallAllUsers=1 "
+          # Exact release setup.ps1 cd/call and flags; only /log is appended. No breakaway or direct msiexec.
+          $command = "cd $pythonArchPath && call $exeName $execParams /quiet /log `"$logPath`""
+          Write-Output ('Diagnostic command: cmd.exe /c ' + $command)
+          $cmd = Join-Path ([Environment]::SystemDirectory) 'cmd.exe'
+          $LASTEXITCODE = $null
+          $ErrorActionPreference = 'Continue'
+          & $cmd /c $command 2>&1 | ForEach-Object { Write-Output $_.ToString() }
+          $exitCode = $LASTEXITCODE
+          $ErrorActionPreference = 'Stop'
+          if ($null -eq $exitCode) {
+              Write-Output 'Diagnostic cmd exit code unavailable: native invocation did not report a code'
+          } else {
+              $signed = [int]$exitCode
+              $hex = [BitConverter]::ToUInt32([BitConverter]::GetBytes($signed), 0).ToString('X8')
+              Write-Output ('DIAGNOSTIC_INSTALLER_EXIT decimal=' + $signed + ' hex=0x' + $hex)
+          }
+          $files = @(Get-ChildItem -LiteralPath $env:RUNNER_TEMP -File -Filter 'python-installer-diagnostic*.log' -ErrorAction SilentlyContinue |
+              Sort-Object LastWriteTime -Descending | Select-Object -First 8)
           $total = 0
-          Write-Output ('Matching Python 3.13 logs: ' + $files.Count + '; selected at most 8')
-          foreach ($file in $selected) {
+          Write-Output ('Explicit-prefix installer logs: ' + $files.Count)
+          foreach ($file in $files) {
               if ($file.Length -gt 262144 -or ($total + $file.Length) -gt 1048576) {
                   Write-Output ('Skipped oversized installer log: ' + $file.Name + '; bytes=' + $file.Length)
                   continue
@@ -98,7 +115,7 @@ jobs:
                       if ($matchedLines.Count -ge 40) { break }
                   }
               }
-              Write-Output '--- Installer error/code excerpts (at most 40 matches, adjacent lines) ---'
+              Write-Output '--- Installer error/code excerpts ---'
               foreach ($index in $matchedLines) {
                   $start = [Math]::Max(0, $index - 1)
                   $end = [Math]::Min($lines.Length - 1, $index + 1)
@@ -110,5 +127,5 @@ jobs:
               Write-Output $text
               Write-Output ('END_SANITIZED_PYTHON_INSTALLER_LOG ' + $file.Name)
           }
-          Write-Output ('=== Python installer diagnostic complete; collected bytes=' + $total + ' ===')
+          Write-Output ('=== Diagnostic retry/log collection complete; bytes=' + $total + '; not a workflow pass ===')
           exit 0
