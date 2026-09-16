@@ -37,9 +37,9 @@ jobs:
         with:
           path: ${{ steps.pip-cache.outputs.PIP_DIR }}
           key:
-            ${{ matrix.os }}-${{ matrix.python-version }}-v1-${{ hashFiles('**/tox.ini') }}
+            ${{ matrix.os }}-${{ matrix.python-version }}-v1-merged-plugin56-20260916-cc31a744-${{ hashFiles('**/tox.ini') }}
           restore-keys: |
-            ${{ matrix.os }}-${{ matrix.python-version }}-v1-
+            ${{ matrix.os }}-${{ matrix.python-version }}-v1-merged-plugin56-20260916-cc31a744-
 
       - name: Install dependencies
         run: |
