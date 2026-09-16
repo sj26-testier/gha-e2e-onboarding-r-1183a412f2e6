@@ -1,8 +1,8 @@
 {
-  "number": 13,
+  "number": 14,
   "sampled_cli_sha": "247d48943729c7a69d764a064a19515c3d8c5b5f",
   "sampled_plugin_sha": "9935ee31df490d981d27373fe59561600221d7eb",
-  "prepared_at": "2026-09-16T07:58:53.929166+00:00",
+  "prepared_at": "2026-09-16T08:02:34.034003+00:00",
   "kind": "Merged plugin proof: original six-step Colorama slice; only primary/all restore cache-key namespace adapted",
   "cache_namespace": "merged-plugin56-20260916-cc31a744",
   "workflow_sha256": "29b1d4b744b939a56e957d09277fd0821896d7e456b2d5a605b8da6f7fb625ce"
